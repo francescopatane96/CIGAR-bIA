@@ -57,6 +57,11 @@ events = cba.analyze_editing_events(
 cbp.plot_cigar_reads(events, chrom="chr20", start=40688387, end=40688661)
 ```
 
+<p align="center">
+  <img src="cigar_bia/KO_viz.png" alt="KO Visualization" width="700" height= 400/>
+</p>
+
+
 ---
 
 ## 📄 License
