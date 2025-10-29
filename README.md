@@ -2,8 +2,10 @@
 **CIGAR-based Indels Analysis**
 
 <p align="center">
-  <img src="cigar_bia/logo.png" alt="CIGAR-bIA Logo" width="500" height="500/>
+  <img src="cigar_bia/logo.png" alt="CIGAR-bIA Logo" width="350" height="350/>
 </p>
+
+
 
 CIGAR-bIA is a Python toolkit for analyzing genomic editing events based on CIGAR strings extracted from BAM files.  
 It provides functions to identify, quantify, and visualize insertions and deletions across specific genomic regions.
