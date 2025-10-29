@@ -9,8 +9,8 @@ setup(
         "pysam",
         "matplotlib"
     ],
-    author="Your Name",
+    author="Francesco Patanè",
     description="CIGAR-Based Indels Analysis for KO/KI evaluation",
-    url="https://github.com/yourusername/cigar_bia",
+    url="https://github.com/francescopatane96/cigar_bia",
     python_requires=">=3.8"
 )
