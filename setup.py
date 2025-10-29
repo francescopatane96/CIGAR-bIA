@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from cigar_bia import __version__
 
 setup(
     name="cigar_bia",
