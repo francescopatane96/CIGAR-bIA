@@ -1,109 +1,101 @@
+
 import pandas as pd
 import pysam
 from collections import Counter
 
-def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status=None, window=3):
+def analyze_editing_events(
+    bam_file,
+    chrom,
+    start,
+    end,
+    meta_file=None,
+    status=None,
+    window=3
+):
     """
-    Analyze deduplicated reads to detect editing events (KO/KI) using CIGAR.
-    Extended to:
-      1) count number of edited bases per read
-      2) compute proportion of edit types across edited reads
-      3) compute detailed counts of base-length-specific events (I1, I2, D1, S3...)
+    Analizza editing basato sul CIGAR.
+    
+    Estrae:
+      - numero totale di reads editate
+      - tipo di modifica (conteggio I/D/S per read)
+      - numero di basi modificate per read (somma)
+      - numero di reads con lunghezza modificata multipla di 3 o no
     """
 
     start_ext = max(0, start - window)
     end_ext = end + window
 
+    # filtra barcodes se necessario
     barcodes_to_use = None
-    if meta_file:
-        meta_df = pd.read_csv(meta_file)
-        barcodes_to_use = set(meta_df.loc[meta_df['status'] == status, 'barcode'])
+    if meta_file is not None:
+        meta = pd.read_csv(meta_file)
+        barcodes_to_use = set(meta.loc[meta["status"] == status, "barcode"])
 
     bam = pysam.AlignmentFile(bam_file, "rb")
-    umi_dict = {}
 
-    # For global editing proportions
-    edit_type_counter = Counter()          # counts of I, D, S
-    edit_length_counter = Counter()        # counts of I_1, I_2, D_3, S_5...
+    results = []
 
     for read in bam.fetch(chrom, start_ext, end_ext):
+
         if read.is_unmapped or read.cigartuples is None:
             continue
+
         try:
-            bc = read.get_tag('CB')
-            umi = read.get_tag('UB')
+            bc = read.get_tag("CB")
+            umi = read.get_tag("UB")
         except KeyError:
             continue
 
         if barcodes_to_use and bc not in barcodes_to_use:
             continue
 
-        key = (bc, umi)
-        if key not in umi_dict:
-            cigar_info = []
-            ref_pos = read.reference_start
+        # ---- ANALISI CIGAR ----
+        edit_counter = Counter()
+        edited_bases = 0
 
-            edited_bases = 0      # total edited bases (I + D + S)
-            edit_types = []       # record types
+        for op, length in read.cigartuples:
 
-            for op, length in read.cigartuples:
+            if op == 1:       # Insertion
+                edit_counter["I"] += 1
+                edited_bases += length
 
-                if op == 0:  # M
-                    cigar_info.append(('M', ref_pos, ref_pos + length))
-                    ref_pos += length
+            elif op == 2:     # Deletion
+                edit_counter["D"] += 1
+                edited_bases += length
 
-                elif op == 1:  # I
-                    cigar_info.append(('I', ref_pos, length))
-                    edited_bases += length
-                    edit_types.append('I')
+            elif op == 4:     # Soft clipping
+                edit_counter["S"] += 1
+                edited_bases += length
 
-                    edit_length_counter[f"I_{length}"] += 1
-                    edit_type_counter["I"] += 1
+        # ignora reads non editate
+        if edited_bases == 0:
+            continue
 
-                elif op == 2:  # D
-                    cigar_info.append(('D', ref_pos, ref_pos + length))
-                    edited_bases += length
-                    edit_types.append('D')
-
-                    edit_length_counter[f"D_{length}"] += 1
-                    edit_type_counter["D"] += 1
-
-                    ref_pos += length
-
-                elif op == 4:  # S
-                    cigar_info.append(('S', ref_pos, length))
-                    edited_bases += length
-                    edit_types.append('S')
-
-                    edit_length_counter[f"S_{length}"] += 1
-                    edit_type_counter["S"] += 1
-
-                elif op == 3:  # N
-                    cigar_info.append(('N', ref_pos, ref_pos + length))
-                    ref_pos += length
-
-                else:
-                    ref_pos += length
-
-            umi_dict[key] = {
-                'name': read.query_name,
-                'start': read.reference_start,
-                'end': read.reference_end,
-                'cigar': cigar_info,
-                'edited_bases': edited_bases,
-                'edit_types': edit_types
-            }
+        # registra la read
+        results.append({
+            "barcode": bc,
+            "umi": umi,
+            "read_name": read.query_name,
+            "I_count": edit_counter["I"],
+            "D_count": edit_counter["D"],
+            "S_count": edit_counter["S"],
+            "edited_bases": edited_bases,
+            "multiple_of_3": (edited_bases % 3 == 0)
+        })
 
     bam.close()
 
-    # ---- compute proportions ----
-    total_edits = sum(edit_type_counter.values())
-    if total_edits > 0:
-        edit_proportions = {
-            etype: count / total_edits
-            for etype, count in edit_type_counter.items()
-        }
-    else:
-        edit_proportions = {"I": 0, "D": 0, "S": 0}
+    df = pd.DataFrame(results)
 
-    return list(umi_dict.values()), edit_proportions, edit_length_counter
+    # ---- METRICHE FINALI ----
+    total_edited_reads = len(df)
+    reads_mult_3 = df["multiple_of_3"].sum()
+    reads_not_mult_3 = total_edited_reads - reads_mult_3
+
+    summary = {
+        "total_edited_reads": total_edited_reads,
+        "reads_multiple_of_3": reads_mult_3,
+        "reads_not_multiple_of_3": reads_not_mult_3
+    }
+
+    return df, summary
