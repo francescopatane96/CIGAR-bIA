@@ -74,7 +74,7 @@ import matplotlib.pyplot as plt
 def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     """
     Analizza e mostra distribuzione modifiche e frameshift solo nell'intervallo start-end.
-    Considera I, D, S come modifiche per calcolare l'efficienza KO.
+    Considera I, D, N come modifiche per calcolare l'efficienza KO.
     """
 
     # Converti in lista di dict se necessario
@@ -98,8 +98,8 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
 
     # --- Calcolo metriche ---
     total_reads = len(df)
-    # considera read editate se I_count, D_count o S_count > 0
-    df['edited_any'] = (df['I_count'] + df['D_count'] + df['S_count']) > 0
+    # considera read editate se I_count, D_count o N_count > 0
+    df['edited_any'] = (df['I_count'] + df['D_count'] + df['N_count']) > 0
     edited_reads = df['edited_any'].sum()
     frameshift_reads = df[df['frameshift'] == True].shape[0]
 
@@ -114,7 +114,7 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     # --- Prepara dati per stacked barplot ---
     records = []
     for _, row in df.iterrows():
-        for edit_type, count in zip(['I','D','S'], [row['I_count'], row['D_count'], row['S_count']]):
+        for edit_type, count in zip(['I','D','N'], [row['I_count'], row['D_count'], row['N_count']]):
             if count > 0:
                 records.append({
                     'edit_type': edit_type,
