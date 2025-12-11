@@ -1,17 +1,17 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import pandas as pd
 
 def plot_cigar_reads(parsed_reads, chrom, start, end, status=None):
     """
     Plot deduplicated reads with CIGAR events.
-
-    Args:
-        parsed_reads (list of dict): List returned by analyze_and_save_editing_events
-        chrom (str): Chromosome.
-        start (int): Start position of target region.
-        end (int): End position of target region.
-        status (str, optional): Condition name for plot title.
+    Compatibile con DataFrame o lista di dict.
     """
+
+    # Se input è DataFrame, converti in lista di dict
+    if isinstance(parsed_reads, pd.DataFrame):
+        parsed_reads = parsed_reads.to_dict(orient='records')
+
     n_reads = len(parsed_reads)
     fig_height = min(5, 0.2 * n_reads + 2)
     fig, ax = plt.subplots(figsize=(6, fig_height))
