@@ -68,13 +68,13 @@ def plot_cigar_reads(parsed_reads, chrom, start, end, status=None):
     plt.show()
 
 
-def plot_editing_summary(parsed_reads, chrom, start, end, status=None):
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     """
-    Deduplica le reads e mostra grafici di editing:
-    1) Efficienza KO (reads editate / tot)
-    2) Stacked barplot: distribuzione tipi di editing (I, D, S) e basi modificate
-       con colore che indica frameshift o no.
-    
+    Analizza e mostra distribuzione modifiche e frameshift solo nell'intervallo start-end.
+
     Args:
         parsed_reads (list of dict or DataFrame): output di analyze_and_save_editing_events
         chrom (str): cromosoma
@@ -83,78 +83,66 @@ def plot_editing_summary(parsed_reads, chrom, start, end, status=None):
         status (str, optional): nome condizione
     """
 
-    # Converti DataFrame in lista di dict
+    # Converti in lista di dict se necessario
     if isinstance(parsed_reads, pd.DataFrame):
         parsed_reads = parsed_reads.to_dict(orient='records')
 
-    # Deduplicazione
+    # --- Deduplicazione interna ---
     seen = set()
     dedup_reads = []
     for read in parsed_reads:
         key = (read.get('barcode'), read.get('umi'))
-        if key not in seen:
+        # considera solo reads che cadono completamente nell'intervallo
+        if key not in seen and read['start'] >= start and read['end'] <= end:
             seen.add(key)
             dedup_reads.append(read)
 
-    # Trasformiamo in DataFrame per comodità
-    df = pd.DataFrame(dedup_reads)
-
-    # --- 1. Efficienza KO ---
-    total_reads = len(df)
-    edited_reads = df['edited'].sum()
-    efficiency = edited_reads / total_reads if total_reads > 0 else 0
-
-    print(f"Chromosome {chrom}:{start}-{end}")
-    print(f"Total reads: {total_reads}")
-    print(f"Edited reads: {edited_reads}")
-    print(f"KO efficiency: {efficiency:.3f}")
-
-    # --- 2. Prepara dati per stacked barplot ---
-    # Trasforma in formato lungo
-    df_long = df.melt(
-        id_vars=['read_name', 'frameshift', 'edited'],
-        value_vars=['I_count', 'D_count', 'S_count'],
-        var_name='edit_type',
-        value_name='count'
-    )
-
-    # Filtra solo reads editate
-    df_long = df_long[df_long['edited'] == True]
-
-    # Se non ci sono reads editate, fermati
-    if df_long.empty:
-        print("No edited reads in the specified region.")
+    if len(dedup_reads) == 0:
+        print("No deduplicated reads in the specified interval.")
         return
 
-    # Stacked barplot: basi modificate per tipo
-    plt.figure(figsize=(8, 5))
-    sns.barplot(
-        data=df_long,
-        x='read_name',
-        y='count',
-        hue='edit_type',
-        dodge=False
-    )
-    plt.xticks([], [])  # nascondi read_name per chiarezza
-    plt.ylabel("Number of edited bases")
-    plt.xlabel("Reads (deduplicated)")
-    plt.title(f"Distribution of editing types per read" + (f" - {status}" if status else ""))
-    plt.legend(title="Edit type")
-    plt.show()
+    df = pd.DataFrame(dedup_reads)
 
-    # --- 3. Stacked barplot frameshift vs non-frameshift ---
-    # Raggruppa totale basi modificate per read
-    df_shift = df_long.groupby(['read_name', 'frameshift']).agg({'count': 'sum'}).reset_index()
+    # --- Calcolo metriche ---
+    total_reads = len(df)
+    edited_reads = df['edited'].sum()
+    frameshift_reads = df[df['frameshift'] == True].shape[0]
 
-    # Pivot per stacked barplot
-    df_pivot = df_shift.pivot(index='read_name', columns='frameshift', values='count').fillna(0)
+    ko_efficiency = edited_reads / total_reads
+    frameshift_fraction = frameshift_reads / total_reads
+
+    print(f"Total reads: {total_reads}")
+    print(f"Edited reads: {edited_reads} -> KO efficiency: {ko_efficiency:.3f}")
+    print(f"Reads with frameshift: {frameshift_reads} -> Fraction: {frameshift_fraction:.3f}")
+
+    # --- Prepara dati per stacked barplot ---
+    # Per ogni read, consideriamo I/D/S e se causa frameshift
+    records = []
+    for _, row in df.iterrows():
+        for edit_type, count in zip(['I','D','S'], [row['I_count'], row['D_count'], row['S_count']]):
+            if count > 0:
+                records.append({
+                    'edit_type': edit_type,
+                    'frameshift': row['frameshift'],
+                    'reads': 1  # contiamo 1 read per tipo di modifica
+                })
+
+    df_long = pd.DataFrame(records)
+
+    if df_long.empty:
+        print("No edited reads in the interval.")
+        return
+
+    # Pivot per stacked barplot: index = edit_type, colonne = frameshift, valori = numero di reads
+    df_plot = df_long.groupby(['edit_type', 'frameshift']).sum().unstack(fill_value=0)['reads']
 
     # Colori: frameshift True = red, False = green
     colors = {True: 'red', False: 'green'}
-    df_pivot.plot(kind='bar', stacked=True, color=[colors[col] for col in df_pivot.columns], figsize=(8,5))
-    plt.ylabel("Number of edited bases")
-    plt.xlabel("Reads (deduplicated)")
-    plt.title(f"Frameshift vs Non-frameshift" + (f" - {status}" if status else ""))
-    plt.legend(title='Frameshift')
-    plt.show()
+    df_plot.plot(kind='bar', stacked=True, color=[colors[col] for col in df_plot.columns], figsize=(6,4))
 
+    plt.ylabel("Number of edited reads")
+    plt.xlabel("Edit type")
+    plt.title(f"Distribution of edited reads by type and frameshift" + (f" - {status}" if status else ""))
+    plt.legend(title="Frameshift")
+    plt.tight_layout()
+    plt.show()
