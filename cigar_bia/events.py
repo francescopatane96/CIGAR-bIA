@@ -8,6 +8,7 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status=N
     Extended to:
       1) count number of edited bases per read
       2) compute proportion of edit types across edited reads
+      3) compute detailed counts of base-length-specific events (I1, I2, D1, S3...)
     """
 
     start_ext = max(0, start - window)
@@ -22,7 +23,8 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status=N
     umi_dict = {}
 
     # For global editing proportions
-    edit_type_counter = Counter()
+    edit_type_counter = Counter()          # counts of I, D, S
+    edit_length_counter = Counter()        # counts of I_1, I_2, D_3, S_5...
 
     for read in bam.fetch(chrom, start_ext, end_ext):
         if read.is_unmapped or read.cigartuples is None:
@@ -55,25 +57,34 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status=N
                     edited_bases += length
                     edit_types.append('I')
 
+                    edit_length_counter[f"I_{length}"] += 1
+                    edit_type_counter["I"] += 1
+
                 elif op == 2:  # D
                     cigar_info.append(('D', ref_pos, ref_pos + length))
                     edited_bases += length
                     edit_types.append('D')
+
+                    edit_length_counter[f"D_{length}"] += 1
+                    edit_type_counter["D"] += 1
+
                     ref_pos += length
 
-                elif op == 3:  # N (skipped)
-                    cigar_info.append(('N', ref_pos, ref_pos + length))
-                    ref_pos += length
-
-                elif op == 4:  # S (soft-clipping)
+                elif op == 4:  # S
                     cigar_info.append(('S', ref_pos, length))
                     edited_bases += length
                     edit_types.append('S')
 
+                    edit_length_counter[f"S_{length}"] += 1
+                    edit_type_counter["S"] += 1
+
+                elif op == 3:  # N
+                    cigar_info.append(('N', ref_pos, ref_pos + length))
+                    ref_pos += length
+
                 else:
                     ref_pos += length
 
-            # register read
             umi_dict[key] = {
                 'name': read.query_name,
                 'start': read.reference_start,
@@ -82,9 +93,6 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status=N
                 'edited_bases': edited_bases,
                 'edit_types': edit_types
             }
-
-            # update global proportions
-            edit_type_counter.update(edit_types)
 
     bam.close()
 
@@ -98,5 +106,4 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status=N
     else:
         edit_proportions = {"I": 0, "D": 0, "S": 0}
 
-    return list(umi_dict.values()), edit_proportions
-
+    return list(umi_dict.values()), edit_proportions, edit_length_counter
