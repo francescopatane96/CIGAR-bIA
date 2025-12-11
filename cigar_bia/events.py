@@ -1,33 +1,30 @@
-
 import pandas as pd
 import pysam
 from collections import Counter
 
-def analyze_editing_events(
+def analyze_and_save_editing_events(
     bam_file,
     chrom,
     start,
     end,
+    output_csv,
     meta_file=None,
     status=None,
     window=3
 ):
     """
-    Analizza editing basato sul CIGAR.
-    
-    Estrae:
-      - numero totale di reads editate
-      - tipo di modifica (conteggio I/D/S per read)
-      - numero di basi modificate per read (somma)
-      - numero di reads con lunghezza modificata multipla di 3 o no
+    Analizza tutte le reads in una regione, salva in un unico CSV:
+      - se la read è editata
+      - numero totale di basi editate
+      - conteggio I/D/S
+      - se provoca frameshift
     """
 
     start_ext = max(0, start - window)
     end_ext = end + window
 
-    # filtra barcodes se necessario
     barcodes_to_use = None
-    if meta_file is not None:
+    if meta_file:
         meta = pd.read_csv(meta_file)
         barcodes_to_use = set(meta.loc[meta["status"] == status, "barcode"])
 
@@ -67,35 +64,25 @@ def analyze_editing_events(
                 edit_counter["S"] += 1
                 edited_bases += length
 
-        # ignora reads non editate
-        if edited_bases == 0:
-            continue
+        is_edited = edited_bases > 0
+        frameshift = False if edited_bases == 0 else (edited_bases % 3 != 0)
 
-        # registra la read
         results.append({
             "barcode": bc,
             "umi": umi,
             "read_name": read.query_name,
+            "edited": is_edited,
+            "edited_bases": edited_bases,
             "I_count": edit_counter["I"],
             "D_count": edit_counter["D"],
             "S_count": edit_counter["S"],
-            "edited_bases": edited_bases,
-            "multiple_of_3": (edited_bases % 3 == 0)
+            "frameshift": frameshift
         })
 
     bam.close()
 
+    # ---- Salva tutto in CSV ----
     df = pd.DataFrame(results)
+    df.to_csv(output_csv, index=False)
 
-    # ---- METRICHE FINALI ----
-    total_edited_reads = len(df)
-    reads_mult_3 = df["multiple_of_3"].sum()
-    reads_not_mult_3 = total_edited_reads - reads_mult_3
-
-    summary = {
-        "total_edited_reads": total_edited_reads,
-        "reads_multiple_of_3": reads_mult_3,
-        "reads_not_multiple_of_3": reads_not_mult_3
-    }
-
-    return df, summary
+    return df
