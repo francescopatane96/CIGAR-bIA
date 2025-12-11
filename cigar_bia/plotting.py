@@ -52,7 +52,7 @@ def plot_cigar_reads(parsed_reads, chrom, start, end, status=None, extra_positio
     # Linee tratteggiate extra se specificate
     if extra_positions:
         for pos in extra_positions[:4]:  # massimo 4 posizioni
-            ax.axvline(pos, color='brown', linestyle='--')
+            ax.axvline(pos, color='grey', linestyle='--')
 
     ax.text((start + end) / 2, n_reads - 1, f"{chrom}:{start}-{end}", ha='center', fontsize=9)
     ax.set_xlim(start - 10, end + 10)
