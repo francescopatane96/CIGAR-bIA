@@ -71,6 +71,9 @@ def plot_cigar_reads(parsed_reads, chrom, start, end, status=None):
 import pandas as pd
 import matplotlib.pyplot as plt
 
+import pandas as pd
+import matplotlib.pyplot as plt
+
 def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     """
     Analizza e mostra distribuzione modifiche e frameshift solo nell'intervallo start-end.
@@ -87,13 +90,13 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     if isinstance(parsed_reads, pd.DataFrame):
         parsed_reads = parsed_reads.to_dict(orient='records')
 
-    # --- Deduplicazione interna ---
+    # --- Deduplicazione interna e selezione reads che intersecano l'intervallo ---
     seen = set()
     dedup_reads = []
     for read in parsed_reads:
         key = (read.get('barcode'), read.get('umi'))
-        # considera solo reads che cadono completamente nell'intervallo
-        if key not in seen and read['start'] >= start and read['end'] <= end:
+        # Include read se interseca l'intervallo
+        if key not in seen and not (read['end'] < start or read['start'] > end):
             seen.add(key)
             dedup_reads.append(read)
 
@@ -111,12 +114,12 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     ko_efficiency = edited_reads / total_reads
     frameshift_fraction = frameshift_reads / total_reads
 
+    print(f"Chromosome {chrom}:{start}-{end}")
     print(f"Total reads: {total_reads}")
     print(f"Edited reads: {edited_reads} -> KO efficiency: {ko_efficiency:.3f}")
     print(f"Reads with frameshift: {frameshift_reads} -> Fraction: {frameshift_fraction:.3f}")
 
     # --- Prepara dati per stacked barplot ---
-    # Per ogni read, consideriamo I/D/S e se causa frameshift
     records = []
     for _, row in df.iterrows():
         for edit_type, count in zip(['I','D','S'], [row['I_count'], row['D_count'], row['S_count']]):
