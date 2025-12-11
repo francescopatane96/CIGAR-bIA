@@ -5,18 +5,34 @@ import pandas as pd
 def plot_cigar_reads(parsed_reads, chrom, start, end, status=None):
     """
     Plot deduplicated reads with CIGAR events.
-    Compatibile con DataFrame o lista di dict.
+    La deduplicazione avviene all'interno della funzione usando (barcode, UMI).
+    
+    Args:
+        parsed_reads (list of dict OR DataFrame): output di analyze_and_save_editing_events
+        chrom (str): Chromosome
+        start (int): Start position of target region
+        end (int): End position of target region
+        status (str, optional): Condition name for plot title
     """
 
-    # Se input è DataFrame, converti in lista di dict
+    # Converti DataFrame in lista di dict
     if isinstance(parsed_reads, pd.DataFrame):
         parsed_reads = parsed_reads.to_dict(orient='records')
 
-    n_reads = len(parsed_reads)
+    # Deduplicazione interna
+    seen = set()
+    dedup_reads = []
+    for read in parsed_reads:
+        key = (read.get('barcode'), read.get('umi'))
+        if key not in seen:
+            seen.add(key)
+            dedup_reads.append(read)
+
+    n_reads = len(dedup_reads)
     fig_height = min(5, 0.2 * n_reads + 2)
     fig, ax = plt.subplots(figsize=(6, fig_height))
 
-    for y, read in enumerate(parsed_reads):
+    for y, read in enumerate(dedup_reads):
         ax.hlines(y, read['start'], read['end'], color='black', linewidth=1)
         for op, start_pos, end_or_len in read['cigar']:
             if op == 'I':
