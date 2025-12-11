@@ -2,7 +2,7 @@ import pandas as pd
 import pysam
 from collections import Counter
 
-def analyze_and_save_editing_events(
+def analyze_editing_events(
     bam_file,
     chrom,
     start,
