@@ -71,19 +71,10 @@ def plot_cigar_reads(parsed_reads, chrom, start, end, status=None):
 import pandas as pd
 import matplotlib.pyplot as plt
 
-import pandas as pd
-import matplotlib.pyplot as plt
-
 def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     """
     Analizza e mostra distribuzione modifiche e frameshift solo nell'intervallo start-end.
-
-    Args:
-        parsed_reads (list of dict or DataFrame): output di analyze_and_save_editing_events
-        chrom (str): cromosoma
-        start (int): inizio regione
-        end (int): fine regione
-        status (str, optional): nome condizione
+    Considera I, D, S come modifiche per calcolare l'efficienza KO.
     """
 
     # Converti in lista di dict se necessario
@@ -95,7 +86,6 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     dedup_reads = []
     for read in parsed_reads:
         key = (read.get('barcode'), read.get('umi'))
-        # Include read se interseca l'intervallo
         if key not in seen and not (read['end'] < start or read['start'] > end):
             seen.add(key)
             dedup_reads.append(read)
@@ -108,7 +98,9 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
 
     # --- Calcolo metriche ---
     total_reads = len(df)
-    edited_reads = df['edited'].sum()
+    # considera read editate se I_count, D_count o S_count > 0
+    df['edited_any'] = (df['I_count'] + df['D_count'] + df['S_count']) > 0
+    edited_reads = df['edited_any'].sum()
     frameshift_reads = df[df['frameshift'] == True].shape[0]
 
     ko_efficiency = edited_reads / total_reads
