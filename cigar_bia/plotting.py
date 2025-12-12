@@ -59,9 +59,7 @@ def plot_cigar_reads(parsed_reads, chrom, start, end, legend=True, status=None, 
         legend_patches = [
             mpatches.Patch(color='black', label='Match (M)'),
             mpatches.Patch(color='blue', label='Insertion (I)'),
-            mpatches.Patch(color='red', label='Deletion (D)'),
-            mpatches.Patch(color='purple', label='Skipped region (N)'),
-            mpatches.Patch(color='orange', label='Soft clipping (S)')
+            mpatches.Patch(color='red', label='Deletion (D)')
         ]
         ax.legend(handles=legend_patches, loc='upper left')
 
