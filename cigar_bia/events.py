@@ -62,7 +62,7 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status=N
                 D_count += length
                 ref_pos += length
             elif op == 3:  # N (skipped)
-                cigar_info.append(('N', ref_pos, ref_pos + length))
+                cigar_info.append(('D', ref_pos, ref_pos + length))
                 edited_bases += length
                 N_count += length
                 ref_pos += length
