@@ -33,10 +33,6 @@ def plot_cigar_reads(parsed_reads, chrom, start, end, legend=True, status=None, 
                 ax.vlines(start_pos, y - 0.3, y + 0.3, color='blue', linewidth=2)
             elif op == 'D':
                 ax.hlines(y, start_pos, end_or_len, color='red', linewidth=3)
-            elif op == 'N':
-                ax.hlines(y, start_pos, end_or_len, color='purple', linewidth=3)
-            elif op == 'S':
-                ax.vlines(start_pos, y - 0.1, y + 0.1, color='orange', linewidth=2)
 
     # Start / end dashed lines
     ax.axvline(start, color='grey', linestyle='--')
