@@ -69,14 +69,16 @@ import matplotlib.pyplot as plt
 def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     """
     Analizza e mostra distribuzione modifiche e frameshift solo nell'intervallo start-end.
-    Considera I, D, N come modifiche per calcolare l'efficienza KO.
+    Considera:
+      - I = insertion
+      - D = deletion + skipped region (N)
     """
 
     # Converti in lista di dict se necessario
     if isinstance(parsed_reads, pd.DataFrame):
         parsed_reads = parsed_reads.to_dict(orient='records')
 
-    # --- Deduplicazione interna e selezione reads che intersecano l'intervallo ---
+    # --- Deduplicazione interna e selezione intervallo ---
     seen = set()
     dedup_reads = []
     for read in parsed_reads:
@@ -91,10 +93,13 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
 
     df = pd.DataFrame(dedup_reads)
 
-    # --- Calcolo metriche ---
+    # --- Unifica D + N ---
+    df['D_total'] = df['D_count'] + df['N_count']
+
+    # --- Metriche globali ---
     total_reads = len(df)
-    # considera read editate se I_count, D_count o N_count > 0
-    df['edited_any'] = (df['I_count'] + df['D_count'] + df['N_count']) > 0
+    df['edited_any'] = (df['I_count'] + df['D_total']) > 0
+
     edited_reads = df['edited_any'].sum()
     frameshift_reads = df[df['frameshift'] == True].shape[0]
 
@@ -109,13 +114,20 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     # --- Prepara dati per stacked barplot ---
     records = []
     for _, row in df.iterrows():
-        for edit_type, count in zip(['I','D','N'], [row['I_count'], row['D_count'], row['N_count']]):
-            if count > 0:
-                records.append({
-                    'edit_type': edit_type,
-                    'frameshift': row['frameshift'],
-                    'reads': 1  # contiamo 1 read per tipo di modifica
-                })
+
+        if row['I_count'] > 0:
+            records.append({
+                'edit_type': 'I',
+                'frameshift': row['frameshift'],
+                'reads': 1
+            })
+
+        if row['D_total'] > 0:
+            records.append({
+                'edit_type': 'D',
+                'frameshift': row['frameshift'],
+                'reads': 1
+            })
 
     df_long = pd.DataFrame(records)
 
@@ -123,16 +135,29 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
         print("No edited reads in the interval.")
         return
 
-    # Pivot per stacked barplot: index = edit_type, colonne = frameshift, valori = numero di reads
-    df_plot = df_long.groupby(['edit_type', 'frameshift']).sum().unstack(fill_value=0)['reads']
+    # --- Aggregazione per plot ---
+    df_plot = (
+        df_long
+        .groupby(['edit_type', 'frameshift'])['reads']
+        .sum()
+        .unstack(fill_value=0)
+    )
 
-    # Colori: frameshift True = red, False = green
+    # --- Plot ---
     colors = {True: 'red', False: 'green'}
-    df_plot.plot(kind='bar', stacked=True, color=[colors[col] for col in df_plot.columns], figsize=(6,4))
+    df_plot.plot(
+        kind='bar',
+        stacked=True,
+        color=[colors[col] for col in df_plot.columns],
+        figsize=(6, 4)
+    )
 
     plt.ylabel("Number of edited reads")
     plt.xlabel("Edit type")
-    plt.title(f"Distribution of edited reads by type and frameshift" + (f" - {status}" if status else ""))
+    plt.title(
+        f"Distribution of edited reads by type and frameshift"
+        + (f" - {status}" if status else "")
+    )
     plt.legend(title="Frameshift")
     plt.tight_layout()
     plt.show()
