@@ -2,7 +2,7 @@ import pandas as pd
 import pysam
 from collections import Counter
 
-def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status=None, window=3):
+def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status_col=None, status=None, window=3):
     """
     Analizza reads deduplicate per (barcode, UMI) e rileva editing events.
     Ora considera I, D e N come modifiche.
@@ -22,7 +22,7 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status=N
     barcodes_to_use = None
     if meta_file:
         meta_df = pd.read_csv(meta_file)
-        barcodes_to_use = set(meta_df.loc[meta_df['status'] == status, 'barcode'])
+        barcodes_to_use = set(meta_df.loc[meta_df[status_col] == status, 'barcode'])
 
     bam = pysam.AlignmentFile(bam_file, "rb")
     umi_dict = {}
