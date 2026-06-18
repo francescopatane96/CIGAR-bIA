@@ -34,13 +34,13 @@ pip install .
 
 ## 💻 Example Usage
 
-### 1️⃣ Import the main modules
+### 1. Import the main modules
 ```python
 import cigar_bia.events as cba
 import cigar_bia.plotting as cbp
 ```
 
-### 2️⃣ Analyze indel events from CIGAR strings
+### 2. Analyze indel events from CIGAR strings
 ```python
 events = cba.analyze_editing_events(
     bam_file="/data/possorted_genome_bam.bam", # be sure your .bam.bai file is in the same location of .bam file
@@ -60,7 +60,7 @@ meta$barcode <- rownames(meta)
 write.csv(meta, "/results/meta_file.csv", row.names = FALSE)
 ```
 
-### 3️⃣ Visualize the results
+### 3. Visualize the results
 ```python
 cbp.plot_cigar_reads(events_ko, chrom="chr20", legend=True, start=40688387, end=40688661, extra_positions=[40688406,
                                                                                            40688607, 40688626,
