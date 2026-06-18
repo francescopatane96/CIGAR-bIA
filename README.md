@@ -43,18 +43,28 @@ import cigar_bia.plotting as cbp
 ### 2️⃣ Analyze indel events from CIGAR strings
 ```python
 events = cba.analyze_editing_events(
-    bam_file="/data/possorted_genome_bam.bam",
+    bam_file="/data/possorted_genome_bam.bam", # be sure your .bam.bai file is in the same location of .bam file
     chrom="chr20",
     start=40688387,
     end=40688661,
     meta_file="/results/meta_mafb_KO.csv",
+    status_col= "Condition",
     status="MAFB-KO"
 )
 ```
 
+the metadata file (meta_file) could be easily obtained direcly from the seurat object via:
+```R
+meta <- seurat_obj@meta.data
+meta$barcode <- rownames(meta)
+write.csv(meta, "/results/meta_file.csv", row.names = FALSE)
+```
+
 ### 3️⃣ Visualize the results
 ```python
-cbp.plot_cigar_reads(events, chrom="chr20", start=40688387, end=40688661)
+cbp.plot_cigar_reads(events_ko, chrom="chr20", legend=True, start=40688387, end=40688661, extra_positions=[40688406,
+                                                                                           40688607, 40688626,
+                                                                                           40688642])
 ```
 
 <p align="center">
@@ -62,6 +72,11 @@ cbp.plot_cigar_reads(events, chrom="chr20", start=40688387, end=40688661)
 </p>
 
 
+### 4. Calculate KO efficiency
+
+```python
+cbp.plot_editing_distribution(events_ko, chrom="chr20", start=40688626, end=40688661, status="MAFB-KO")
+```
 ---
 
 ## 📄 License
