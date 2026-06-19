@@ -94,7 +94,7 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     df = pd.DataFrame(dedup_reads)
 
     # --- Unifica D + N ---
-    df['D_total'] = df['D_count'] + df['N_count']
+    df['D_total'] = df['D_count'] #+ df['N_count']
 
     # --- Metriche globali ---
     total_reads = len(df)
