@@ -65,19 +65,21 @@ def plot_cigar_reads(parsed_reads, chrom, start, end, legend=True, status=None, 
 
 import pandas as pd
 import matplotlib.pyplot as plt
-
 def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
     """
     Analizza e mostra distribuzione modifiche e frameshift solo nell'intervallo start-end.
     Considera:
       - I = insertion
       - D = deletion + skipped region (N)
-    """
 
+    La percentuale di reads modificate (KO efficiency) viene calcolata come
+    semplice rapporto reads con edited == True / reads totali, usando il
+    flag 'edited' già calcolato a monte (in analyze_editing_events), senza
+    ricalcolarlo qui su I_count/D_count/N_count.
+    """
     # Converti in lista di dict se necessario
     if isinstance(parsed_reads, pd.DataFrame):
         parsed_reads = parsed_reads.to_dict(orient='records')
-
     # --- Deduplicazione interna e selezione intervallo ---
     seen = set()
     dedup_reads = []
@@ -86,55 +88,41 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
         if key not in seen and not (read['end'] < start or read['start'] > end):
             seen.add(key)
             dedup_reads.append(read)
-
     if len(dedup_reads) == 0:
         print("No deduplicated reads in the specified interval.")
         return
-
     df = pd.DataFrame(dedup_reads)
-
-    # --- Unifica D + N ---
+    # --- Unifica D + N (solo per il plot per tipo di edit, non per la KO efficiency) ---
     df['D_total'] = df['D_count'] + df['N_count']
-
     # --- Metriche globali ---
     total_reads = len(df)
-    df['edited_any'] = (df['I_count'] + df['D_total']) > 0
-
-    edited_reads = df['edited_any'].sum()
+    edited_reads = df['edited'].sum()
     frameshift_reads = df[df['frameshift'] == True].shape[0]
-
     ko_efficiency = edited_reads / total_reads
     frameshift_fraction = frameshift_reads / total_reads
-
     print(f"Chromosome {chrom}:{start}-{end}")
     print(f"Total reads: {total_reads}")
     print(f"Edited reads: {edited_reads} -> KO efficiency: {ko_efficiency:.3f}")
     print(f"Reads with frameshift: {frameshift_reads} -> Fraction: {frameshift_fraction:.3f}")
-
     # --- Prepara dati per stacked barplot ---
     records = []
     for _, row in df.iterrows():
-
         if row['I_count'] > 0:
             records.append({
                 'edit_type': 'I',
                 'frameshift': row['frameshift'],
                 'reads': 1
             })
-
         if row['D_total'] > 0:
             records.append({
                 'edit_type': 'D',
                 'frameshift': row['frameshift'],
                 'reads': 1
             })
-
     df_long = pd.DataFrame(records)
-
     if df_long.empty:
         print("No edited reads in the interval.")
         return
-
     # --- Aggregazione per plot ---
     df_plot = (
         df_long
@@ -142,7 +130,6 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
         .sum()
         .unstack(fill_value=0)
     )
-
     # --- Plot ---
     colors = {True: 'red', False: 'green'}
     df_plot.plot(
@@ -151,7 +138,6 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
         color=[colors[col] for col in df_plot.columns],
         figsize=(6, 4)
     )
-
     plt.ylabel("Number of edited reads")
     plt.xlabel("Edit type")
     plt.title(
