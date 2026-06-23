@@ -65,17 +65,25 @@ def plot_cigar_reads(parsed_reads, chrom, start, end, legend=True, status=None, 
 
 import pandas as pd
 import matplotlib.pyplot as plt
-def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
+def plot_editing_distribution(parsed_reads, chrom, start, end, status=None, count_N_as_edit=True):
     """
     Analizza e mostra distribuzione modifiche e frameshift solo nell'intervallo start-end.
     Considera:
       - I = insertion
       - D = deletion + skipped region (N)
 
-    La percentuale di reads modificate (KO efficiency) viene calcolata come
-    semplice rapporto reads con edited == True / reads totali, usando il
-    flag 'edited' già calcolato a monte (in analyze_editing_events), senza
-    ricalcolarlo qui su I_count/D_count/N_count.
+    NB sulla KO efficiency:
+    La colonna 'edited' (calcolata a monte in analyze_editing_events) è True
+    solo se I_count>0 o D_count>0, perché N può rappresentare splicing reale
+    in regioni generiche. Tuttavia in questa finestra (interna a un singolo
+    esone, RBPJ exon 7) sappiamo che STAR etichetta come N anche le vere
+    delezioni CRISPR quando superano la soglia alignIntronMin (~21bp) -
+    quindi escludere N qui sottostimerebbe la KO efficiency reale.
+
+    Per questo la KO efficiency viene calcolata su un criterio dedicato
+    (edited_total) che include N_count, separato dalla colonna 'edited'
+    stretta. Imposta count_N_as_edit=False se in futuro usi questa funzione
+    su una finestra che include veri confini esone-introne.
     """
     # Converti in lista di dict se necessario
     if isinstance(parsed_reads, pd.DataFrame):
@@ -92,17 +100,30 @@ def plot_editing_distribution(parsed_reads, chrom, start, end, status=None):
         print("No deduplicated reads in the specified interval.")
         return
     df = pd.DataFrame(dedup_reads)
-    # --- Unifica D + N (solo per il plot per tipo di edit, non per la KO efficiency) ---
+    # --- Unifica D + N per conteggi e plot ---
     df['D_total'] = df['D_count'] + df['N_count']
     # --- Metriche globali ---
     total_reads = len(df)
-    edited_reads = df['edited'].sum()
+
+    # KO efficiency: criterio dedicato che, se count_N_as_edit=True, include
+    # anche N_count (vedi motivazione nella docstring)
+    if count_N_as_edit:
+        edited_total = (df['I_count'] + df['D_count'] + df['N_count']) > 0
+    else:
+        edited_total = df['edited']  # criterio stretto I/D, calcolato a monte
+
+    edited_reads = edited_total.sum()
     frameshift_reads = df[df['frameshift'] == True].shape[0]
     ko_efficiency = edited_reads / total_reads
     frameshift_fraction = frameshift_reads / total_reads
+
+    # Per trasparenza, mostra anche il conteggio stretto (solo I/D) a confronto
+    edited_strict = df['edited'].sum()
+
     print(f"Chromosome {chrom}:{start}-{end}")
     print(f"Total reads: {total_reads}")
-    print(f"Edited reads: {edited_reads} -> KO efficiency: {ko_efficiency:.3f}")
+    print(f"Edited reads (I/D only, strict): {edited_strict}")
+    print(f"Edited reads (I/D + N, used for KO efficiency): {edited_reads} -> KO efficiency: {ko_efficiency:.3f}")
     print(f"Reads with frameshift: {frameshift_reads} -> Fraction: {frameshift_fraction:.3f}")
     # --- Prepara dati per stacked barplot ---
     records = []
