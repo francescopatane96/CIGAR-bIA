@@ -1,7 +1,6 @@
 import pandas as pd
 import pysam
 from collections import Counter
-
 def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status_col=None, status=None, window=3):
     """
     Analizza reads deduplicate per (barcode, UMI) e rileva editing events.
@@ -18,15 +17,12 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status_c
     """
     start_ext = max(0, start - window)
     end_ext = end + window
-
     barcodes_to_use = None
     if meta_file:
         meta_df = pd.read_csv(meta_file)
         barcodes_to_use = set(meta_df.loc[meta_df[status_col] == status, 'barcode'])
-
     bam = pysam.AlignmentFile(bam_file, "rb")
     umi_dict = {}
-
     for read in bam.fetch(chrom, start_ext, end_ext):
         if read.is_unmapped or read.cigartuples is None:
             continue
@@ -35,19 +31,15 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status_c
             umi = read.get_tag('UB')
         except KeyError:
             continue
-
         if barcodes_to_use and bc not in barcodes_to_use:
             continue
-
         key = (bc, umi)
         if key in umi_dict:
             continue  # deduplicazione
-
         cigar_info = []
         ref_pos = read.reference_start
         edited_bases = 0
         I_count = D_count = N_count = 0
-
         for op, length in read.cigartuples:
             if op == 0:  # M
                 cigar_info.append(('M', ref_pos, ref_pos + length))
@@ -71,10 +63,8 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status_c
                 ref_pos += length
             else:
                 ref_pos += length
-
         frameshift = (edited_bases % 3) != 0
-        edited = edited_bases > 0
-
+        edited = (I_count > 0) or (D_count > 0)
         umi_dict[key] = {
             'name': read.query_name,
             'start': read.reference_start,
@@ -89,6 +79,5 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status_c
             'barcode': bc,
             'umi': umi
         }
-
     bam.close()
     return list(umi_dict.values())
