@@ -3,16 +3,16 @@ import pysam
 from collections import Counter
 def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status_col=None, status=None, window=3):
     """
-    Analizza reads deduplicate per (barcode, UMI) e rileva editing events.
-    Ora considera I, D e N come modifiche.
+    deduplicate reads per (barcode, UMI) and identify editing events.
+    consider I, D e N as events.
     
-    Restituisce lista di dict con:
+    dict:
         - name, start, end
         - cigar
         - I_count, D_count, N_count
         - edited (True/False)
         - edited_bases
-        - frameshift (True se non multiplo di 3)
+        - frameshift 
         - barcode, umi
     """
     start_ext = max(0, start - window)
@@ -35,7 +35,7 @@ def analyze_editing_events(bam_file, chrom, start, end, meta_file=None, status_c
             continue
         key = (bc, umi)
         if key in umi_dict:
-            continue  # deduplicazione
+            continue  # dedupl
         cigar_info = []
         ref_pos = read.reference_start
         edited_bases = 0
